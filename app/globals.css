@@ -120,3 +120,63 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Light mode CSS variables */
+:root {
+  --lectra-primary: #FFD500;
+  --lectra-primary-dark: #E6C000;
+  --lectra-primary-light: #FFF4A8;
+  
+  --lectra-bg: #ffffff;
+  --lectra-surface: #f7eded;
+  --lectra-card: #F3F3F3;
+  --lectra-border: #f1eaea;
+  --lectra-text: #111111;
+  --lectra-text-secondary: #555555;
+  
+  --lectra-accent: #3B82F6;
+  --lectra-accent-hover: #2563EB;
+  
+  --lectra-success: #22C55E;
+  --lectra-warning: #F59E0B;
+  --lectra-error: #EF4444;
+}
+
+.dark {
+  --lectra-primary: #FEE715;
+  --lectra-primary-dark: #E5D412;
+  --lectra-primary-light: #3A3303;
+  
+  --lectra-bg: #0D0D0D;
+  --lectra-surface: #1A1A1A;
+  --lectra-card: #111111;
+  --lectra-border: #2A2A2A;
+  
+  --lectra-text: #FAFAFA;
+  --lectra-text-secondary: #A1A1A1;
+  
+  --lectra-accent: #60A5FA;
+  --lectra-accent-hover: #3B82F6;
+  
+  --lectra-success: #22C55E;
+  --lectra-warning: #FBBF24;
+  --lectra-error: #EF4444;
+}
+
+/* Link CSS vars to Tailwind theme utilities */
+@theme inline {
+  --color-lectra-primary: var(--lectra-primary);
+  --color-lectra-primary-dark: var(--lectra-primary-dark);
+  --color-lectra-primary-light: var(--lectra-primary-light);
+  --color-lectra-bg: var(--lectra-bg);
+  --color-lectra-surface: var(--lectra-surface);
+  --color-lectra-card: var(--lectra-card);
+  --color-lectra-border: var(--lectra-border);
+  --color-lectra-text: var(--lectra-text);
+  --color-lectra-text-secondary: var(--lectra-text-secondary);
+  --color-lectra-accent: var(--lectra-accent);
+  --color-lectra-accent-hover: var(--lectra-accent-hover);
+  --color-lectra-success: var(--lectra-success);
+  --color-lectra-warning: var(--lectra-warning);
+  --color-lectra-error: var(--lectra-error);
+}
