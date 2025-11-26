@@ -3,28 +3,53 @@
 import Container from "@/components/Container";
 import CourseCard from "@/components/CourseCard";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import backgroundImg from "@/public/background-plain.jpg"
+import { Course } from "@/app/types/course"
+import { useEffect, useMemo, useState } from "react";
 
 
 export default function SchoolDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
+
   const schoolID = params.schoolID as string;
+  const campusID = searchParams.get('campus');
   
-  // Convert slug to readable name
   const schoolName = schoolID
     .split('-')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 
-  const schoolCourses = [
-    { code: 'CS 101', name: 'Introduction to Computer Science', students: '2.3k+', color: 'bg-blue-600', department: 'Computer Science', school: schoolName },
-    { code: 'MATH 137', name: 'Calculus I for Honours Mathematics', students: '1.8k+', color: 'bg-purple-600', department: 'Mathematics', school: schoolName },
-    { code: 'ECON 101', name: 'Microeconomic Theory', students: '3.1k+', color: 'bg-green-600', department: 'Economics', school: schoolName },
-    { code: 'PSY 102', name: 'Introduction to Psychology', students: '2.9k+', color: 'bg-pink-600', department: 'Psychology', school: schoolName },
-    { code: 'ENG 200', name: 'Professional Communication', students: '1.5k+', color: 'bg-red-600', department: 'Engineering', school: schoolName },
-    { code: 'BIO 120', name: 'Fundamentals of Biology', students: '2.2k+', color: 'bg-teal-600', department: 'Biology', school: schoolName },
-  ];
+  const campusName = campusID 
+    ? decodeURIComponent(campusID)
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+    : null;
+
+  const displayName = campusName ? `${schoolName} - ${campusName}` : schoolName;
+
+  const [courses, setCourses] = useState<Course[]>([]);
+  
+    useEffect(() => {
+        const fetchCourses = async() => {
+          const url = campusID 
+            ? `/api/courses/${schoolID}?campus=${campusID}`
+            : `/api/courses/${schoolID}`;
+          const res = await fetch(url);
+          const data = await res.json();
+          setCourses(data);
+        };
+    
+        fetchCourses();
+      }, [schoolID, campusID]);
+    
+      const topCourses = useMemo(() => {
+        return [...courses]
+          .sort((a, b) => b.num_of_files - a.num_of_files)
+          .slice(0, 6);
+      }, [courses]);
 
   return (
     <Container>
@@ -52,7 +77,7 @@ export default function SchoolDetailPage() {
           </h1>
 
           <p className="text-xl text-lectra-text-secondary mb-12 font-medium leading-relaxed max-w-2xl mx-auto">
-            Browse all courses offered at {schoolName}. Access lecture notes, study guides, and connect with fellow students.
+            Browse all courses offered at {displayName}. Access lecture notes, study guides, and connect with fellow students.
           </p>
 
           {/* Search Bar */}
@@ -97,15 +122,10 @@ export default function SchoolDetailPage() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {schoolCourses.map((course) => (
+            {topCourses.map((course) => (
               <CourseCard
-                key={course.code}
-                code={course.code}
-                name={course.name}
-                students={course.students}
-                color={course.color}
-                department={course.department}
-                school={course.school}
+                key={course.course_code}
+                {...course}
               />
             ))}
           </div>

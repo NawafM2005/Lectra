@@ -1,29 +1,37 @@
 import Link from "next/link";
 import Container from "./Container";
+import { School } from "@/app/types/school"
+import Image from "next/image";
 
-interface SchoolCardProps {
-    name: string;
-    students: string;
-    color: string;
-}
-
-export default function SchoolCard({name, students, color}: SchoolCardProps) {
+export default function SchoolCard(school: School) {
+    const { name, campus, num_of_files, logo_url } = school;
     const schoolFormatted = name.toLowerCase().replace(/\s/g, '-');
+    const campusFormatted = campus ? encodeURIComponent(campus.toLowerCase()) : "";
 
+    const href = campus 
+        ? `/schools/${schoolFormatted}?campus=${campusFormatted}`
+        : `/schools/${schoolFormatted}`;
     return (
-        <Link href={`/schools/${schoolFormatted}`}>
+        <Link href={`${href}`}>
             <Container className="group relative bg-lectra-surface border-3 border-lectra-border rounded-2xl p-6 hover:border-lectra-primary-dark transition-all duration-500 hover:shadow-xl hover:shadow-lectra-primary/5 cursor-pointer">
                 <div className="flex items-start justify-between mb-6">
-                    <div className={`w-12 h-12 ${color} rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg`}>
-                        {name.charAt(0)}
+                    <div className="rounded-xl flex items-center justify-center font-bold text-xl shadow-lg overflow-hidden bg-white">
+                        <Image 
+                            src={logo_url} 
+                            alt={`${name} logo`}
+                            width={0}
+                            height={0}
+                            sizes="100vw"
+                            className="w-auto h-auto max-w-[120px] max-h-[60px] p-1 object-contain"
+                        />
                     </div>
                     <span className="bg-black/60 text-white text-xs font-bold px-3 py-1 rounded-full border border-lectra-border">
-                        100+ Files
+                        {num_of_files} Files
                     </span>
                 </div>
         
                 <h3 className="text-xl font-bold text-black mb-2">
-                    {name}
+                    {campus ? `${name} - ${campus}` : name}
                 </h3>
                 <p className="text-black/80 text-sm mb-6">
                     Access shared notes, past exams, and study guides.

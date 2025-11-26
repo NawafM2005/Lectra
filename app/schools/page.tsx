@@ -4,17 +4,27 @@ import Container from "@/components/Container";
 import SchoolCard from "@/components/SchoolCard";
 import Link from "next/link";
 import backgroundImg from "@/public/background-plain.jpg"
+import { useEffect, useMemo, useState } from "react";
+import { School } from "@/app/types/school"
 
 export default function Schools() {
 
-  const schools = [
-    { name: 'University of Toronto', students: '12k+', color: 'bg-blue-900'},
-    { name: 'York University', students: '8k+', color: 'bg-red-700' },
-    { name: 'Toronto Metropolitan University', students: '9k+', color: 'bg-blue-600' },
-    { name: 'University of Guelph', students: '5k+', color: 'bg-red-600' },
-    { name: 'University of Waterloo', students: '15k+', color: 'bg-yellow-500' },
-    { name: 'Wilfrid Laurier University', students: '6k+', color: 'bg-purple-800' },
-  ];
+  const [schools, setSchools] = useState<School[]>([]);
+
+  useEffect(() => {
+    const fetchSchools = async() => {
+      const res = await fetch("/api/schools");
+      const data = await res.json();
+      setSchools(data);
+    };
+
+    fetchSchools();
+  }, []);
+
+  const topSchools = useMemo(() => {
+    return [...schools]
+      .sort((a, b) => b.num_of_files - a.num_of_files);
+  }, [schools]);
 
   return (
     <Container>
@@ -71,12 +81,10 @@ export default function Schools() {
           </div>
           
           <Container className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {schools.map((school) => (
+            {topSchools.map((school) => (
               <SchoolCard
-              key={school.name}
-              name={school.name}
-              students={school.students}
-              color={school.color}
+              key={school.name + "-" + school.campus}
+              {...school}
               />
             ))}
           </Container>
