@@ -31,6 +31,9 @@ export default function SchoolDetailPage() {
   const displayName = campusName ? `${schoolName} - ${campusName}` : schoolName;
 
   const [courses, setCourses] = useState<Course[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
   
     useEffect(() => {
         const fetchCourses = async() => {
@@ -51,10 +54,27 @@ export default function SchoolDetailPage() {
           .slice(0, 6);
       }, [courses]);
 
+    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const query = e.target.value;
+      setSearchQuery(query);
+  
+      if (query.length > 0) {
+        const filtered = courses.filter((course) => 
+          course.course_name.toLowerCase().includes(query.toLowerCase()) ||
+          course.course_code.toLowerCase().includes(query.toLowerCase())
+        );
+        setFilteredCourses(filtered);
+        setShowDropdown(true);
+      } else {
+        setFilteredCourses([]);
+        setShowDropdown(false);
+      }
+    };
+
   return (
     <Container>
       {/* Hero Section */}
-      <section className="relative min-h-[60vh] flex items-center justify-center bg-lectra-surface overflow-hidden"
+      <section className="relative min-h-[60vh] flex items-center justify-center bg-lectra-surface"
       style={{
           backgroundImage: `url(${backgroundImg.src})`,
           backgroundSize: 'cover',
@@ -85,6 +105,9 @@ export default function SchoolDetailPage() {
             <div className="relative flex items-center bg-white rounded-2xl shadow-xl">
               <input 
                 type="text" 
+                value={searchQuery}
+                onChange={handleSearch}
+                onFocus={() => searchQuery.length > 0 && setShowDropdown(true)}
                 placeholder={`Search courses at ${schoolName}...`}
                 className="w-full px-6 py-6 text-lg font-medium bg-transparent text-lectra-text placeholder-lectra-text-secondary/50 focus:outline-none"
               />
@@ -94,6 +117,44 @@ export default function SchoolDetailPage() {
                 </button>
               </div>
             </div>
+
+            {/* Dropdown Results */}
+            {showDropdown && searchQuery.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 max-h-80 overflow-y-auto">
+                {filteredCourses.length > 0 ? (
+                  filteredCourses.map((course) => {
+                    const courseFormatted = course.course_code.toLowerCase().replace(/\s/g, '-');
+                    const schoolFormatted = course.school.name.toLowerCase().replace(/\s/g, '-');
+                    const campusParam = course.school.campus 
+                        ? `?campus=${encodeURIComponent(course.school.campus.toLowerCase())}`
+                        : '';
+                    const href = `/schools/${schoolFormatted}/${courseFormatted}${campusParam}`;
+
+                    return (
+                      <Link 
+                        key={course.course_code}
+                        href={href}
+                        className="block px-6 py-4 hover:bg-gray-50 border-b border-gray-50 last:border-none transition-colors text-left"
+                        onClick={() => setShowDropdown(false)}
+                      >
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <div className="font-bold text-lectra-text flex items-center gap-2">
+                              <span className="bg-lectra-accent/10 text-lectra-accent text-xs px-2 py-0.5 rounded-full">{course.course_code}</span>
+                              {course.course_name}
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })
+                ) : (
+                  <div className="px-6 py-4 text-gray-400 text-center">
+                    No courses found
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Stats */}
@@ -117,7 +178,7 @@ export default function SchoolDetailPage() {
           <div className="flex items-center justify-between mb-12">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold text-lectra-text mb-2">Popular Courses</h2>
-              <p className="text-lectra-text-secondary">Most accessed courses at {schoolName}</p>
+              <p className="text-lectra-text-secondary">Most accessed courses at {displayName}</p>
             </div>
           </div>
           

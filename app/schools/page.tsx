@@ -10,6 +10,9 @@ import { School } from "@/app/types/school"
 export default function Schools() {
 
   const [schools, setSchools] = useState<School[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredSchools, setFilteredSchools] = useState<School[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     const fetchSchools = async() => {
@@ -26,9 +29,27 @@ export default function Schools() {
       .sort((a, b) => b.num_of_files - a.num_of_files);
   }, [schools]);
 
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+
+    if (query.length > 0) {
+      const filtered = schools.filter((school) =>
+        school.name.toLowerCase().includes(query.toLowerCase()) ||
+        school.campus?.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredSchools(filtered);
+      setShowDropdown(true);
+    }
+    else {
+      setFilteredSchools([]);
+      setShowDropdown(false);
+    }
+  };
+
   return (
     <Container>
-      <section className="relative min-h-[60vh] flex items-center justify-center overflow-hidden"
+      <section className="relative min-h-[60vh] flex items-center justify-center"
       style={{
           backgroundImage: `url(${backgroundImg.src})`,
           backgroundSize: 'cover',
@@ -52,6 +73,9 @@ export default function Schools() {
             <div className="relative flex items-center bg-white rounded-2xl shadow-xl">
               <input 
                 type="text" 
+                value={searchQuery}
+                onChange={handleSearch}
+                onFocus={() => searchQuery.length > 0 && setShowDropdown(true)}
                 placeholder="Search for your university..."
                 className="w-full px-6 py-6 text-lg font-medium bg-transparent text-lectra-text placeholder-lectra-text-secondary/50 focus:outline-none"
               />
@@ -61,6 +85,39 @@ export default function Schools() {
                 </button>
               </div>
             </div>
+
+            {/* Dropdown Results */}
+            {showDropdown && searchQuery.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 max-h-80 overflow-y-auto">
+                {filteredSchools.length > 0 ? (
+                  filteredSchools.map((school) => {
+                    const schoolFormatted = school.name.toLowerCase().replace(/\s/g, '-');
+                    const campusFormatted = school.campus ? encodeURIComponent(school.campus.toLowerCase()) : "";
+                    const href = school.campus 
+                        ? `/schools/${schoolFormatted}?campus=${campusFormatted}`
+                        : `/schools/${schoolFormatted}`;
+                    
+                    return (
+                      <Link 
+                        key={school.name + (school.campus || '')}
+                        href={href}
+                        className="block px-6 py-4 hover:bg-gray-50 border-b border-gray-50 last:border-none transition-colors text-left"
+                        onClick={() => setShowDropdown(false)}
+                      >
+                        <div className="font-bold text-lectra-text">{school.name}</div>
+                        {school.campus && (
+                          <div className="text-sm text-lectra-text-secondary">{school.campus}</div>
+                        )}
+                      </Link>
+                    );
+                  })
+                ) : (
+                  <div className="px-6 py-4 text-gray-400 text-center">
+                    No schools found
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <p className="text-sm text-lectra-text-secondary font-medium">

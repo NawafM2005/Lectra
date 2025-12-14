@@ -46,7 +46,7 @@ export default function Home() {
                 <div className="w-3 h-3 rounded-full bg-red-400"></div>
                 <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
                 <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                <div className="ml-4 bg-white border border-gray-200 rounded-md px-3 py-1 text-xs text-gray-400 flex-1 text-center font-mono">lectra.app/tmu/cps109</div>
+                <div className="ml-4 bg-white border border-gray-200 rounded-md px-3 py-1 text-xs text-gray-400 flex-1 text-center font-mono">lectra.app</div>
               </div>
               <div className="p-8 bg-white min-h-[400px] flex flex-col items-center justify-center bg-[url('/grid.svg')] bg-center">
                  <div className="text-center space-y-4">
@@ -65,7 +65,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 text-center">
           <p className="text-sm font-bold text-lectra-text-secondary uppercase tracking-widest mb-8">Trusted by students at top universities</p>
           <div className="flex flex-wrap justify-center gap-12 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-             {['Harvard', 'York', 'Western', 'UofT', 'Waterloo', 'TMU'].map(uni => (
+             {['McMaster', 'York', 'Western', 'UofT', 'Waterloo', 'TMU'].map(uni => (
                <span key={uni} className="text-2xl font-serif font-bold text-lectra-text">{uni}</span>
              ))}
           </div>
@@ -88,7 +88,7 @@ export default function Home() {
                 <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-2xl mb-6 shadow-sm">💬</div>
                 <h3 className="text-3xl font-bold text-lectra-text mb-4">Chat with your Course</h3>
                 <p className="text-lg text-lectra-text-secondary max-w-md">
-                  Don&apos;t just read. Get involved! Ask questions about your lecture slides and get answers that are directly relevant to your course. No more guessing, only real, accurate info!                </p>
+                  Don&apos;t just read. Get involved! Ask questions about your lecture slides and get answers that are directly relevant to your course. No more guessing, only real, accurate info!</p>
               </div>
               <div className="absolute right-0 bottom-0 w-3/4 h-3/4 bg-white rounded-tl-3xl border-t border-l border-lectra-border shadow-2xl translate-y-25 translate-x-12 group-hover:translate-x-8 group-hover:translate-y-20 transition-transform duration-500 p-6">
                 <div className="space-y-4">
@@ -100,7 +100,7 @@ export default function Home() {
                     <div className="w-8 h-8 rounded-full bg-lectra-primary flex items-center justify-center text-xs font-bold">AI</div>
                     <div className="bg-lectra-primary/10 rounded-2xl rounded-tr-none p-3 text-sm text-lectra-text w-3/4">
                       <span className="font-bold block mb-1 text-xs uppercase tracking-wide text-lectra-primary-dark">Answer</span>
-                      Mitosis results in two identical daughter cells, while meiosis results in four genetically unique sex cells...
+                      Mitosis results in two identical daughter cells, while meiosis results in four genetically unique sex cells... &apos;Lecture 05&apos;
                     </div>
                   </div>
                 </div>
@@ -138,19 +138,19 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
             <div className="space-y-2">
-              <h4 className="text-5xl font-bold text-lectra-primary">1+</h4>
+              <h4 className="text-5xl font-bold text-lectra-primary">500+</h4>
               <p className="text-white/60 font-medium">Files Processed</p>
             </div>
             <div className="space-y-2">
-              <h4 className="text-5xl font-bold text-lectra-primary">50+</h4>
+              <h4 className="text-5xl font-bold text-lectra-primary">10+</h4>
               <p className="text-white/60 font-medium">Universities</p>
             </div>
             <div className="space-y-2">
-              <h4 className="text-5xl font-bold text-lectra-primary">1+</h4>
+              <h4 className="text-5xl font-bold text-lectra-primary">200+</h4>
               <p className="text-white/60 font-medium">Courses</p>
             </div>
             <div className="space-y-2">
-              <h4 className="text-5xl font-bold text-lectra-primary">0$</h4>
+              <h4 className="text-5xl font-bold text-lectra-primary">$0</h4>
               <p className="text-white/60 font-medium">Cost to Start</p>
             </div>
           </div>

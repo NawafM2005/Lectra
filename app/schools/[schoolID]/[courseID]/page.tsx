@@ -4,6 +4,27 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Course } from "@/app/types/course"
+import { File } from "@/app/types/file"
+import dynamic from 'next/dynamic';
+import FilePopUp from "@/components/FilePopUp";
+
+// Dynamically import react-pdf components with no SSR
+const Document = dynamic(
+    () => import('react-pdf').then((mod) => mod.Document),
+    { ssr: false }
+);
+
+const Page = dynamic(
+    () => import('react-pdf').then((mod) => mod.Page),
+    { ssr: false }
+);
+
+// Configure PDF.js worker on client side only
+if (typeof window !== 'undefined') {
+    import('react-pdf').then((pdfjs) => {
+        pdfjs.pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.pdfjs.version}/build/pdf.worker.min.mjs`;
+    });
+}
 
 export default function CourseDetailPage() {
     const params = useParams();
@@ -15,8 +36,11 @@ export default function CourseDetailPage() {
 
     const [activeTab, setActiveTab] = useState<'materials' | 'upload'>('materials');
     const [uploadType, setUploadType] = useState('quiz');
+    const [materialFilter, setMaterialFilter] = useState<'all' | 'test' | 'assignment' | 'notes' | 'lecture' | 'other'>('all');
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
     const [course, setCourse] = useState<Course | null>(null);
+    const [files, setFiles] = useState<File[] | null>(null);
         
     const schoolName = schoolID
         ? schoolID.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
@@ -47,27 +71,44 @@ export default function CourseDetailPage() {
         }
 
         fetchCourse();
-    }, [schoolID, courseID, campusParam]);
+    }, []);
 
-    if (!course){
+    useEffect(() => {
+        const fetchFiles = async () => {
+            try {
+                const formatedCourseID = courseID.replace("-", " ");
+                const res = await fetch(`/api/files/${formatedCourseID}`);
+                const data = await res.json();
+
+                if (Array.isArray(data)) {
+                    const formattedData = data.map((file: File) => ({
+                        ...file,
+                        upload_date: new Date(file.upload_date).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                        })
+                    }));
+                    
+                    setFiles(formattedData);
+                }
+            } catch (error) {
+                console.error("Error fetching files:", error);
+            }
+        }
+
+        fetchFiles();
+    }, [activeTab]);
+
+     if (!course){
         return null;
     }
 
+    // Filter materials based on selected filter
+    const filteredMaterials = materialFilter === 'all' 
+        ? files 
+        : files?.filter(f => f.file_type === materialFilter);
 
-    // Mock Data
-    const quizzes = [
-        { title: 'Week 1 Quiz', date: 'Nov 10', score: '10/10' },
-        { title: 'HTML Basics', date: 'Nov 12', score: '8/10' },
-        { title: 'CSS Selectors', date: 'Nov 15', score: '9/10' },
-        { title: 'Flexbox Froggy', date: 'Nov 18', score: '-' },
-        { title: 'Grid Garden', date: 'Nov 20', score: '-' },
-    ];
-
-    const assignments = [
-        { title: 'Build a Portfolio', date: 'Due Nov 25', status: 'Pending' },
-        { title: 'Responsive Layout', date: 'Due Dec 01', status: 'Not Started' },
-        { title: 'JS Calculator', date: 'Due Dec 05', status: 'Locked' },
-    ];
 
     return (
         <div className="flex flex-col h-[calc(100vh-80px)] bg-white overflow-hidden">
@@ -95,7 +136,7 @@ export default function CourseDetailPage() {
         <div className="flex-1 flex overflow-hidden">
             
             {/* Left: Chat (Scrollable) */}
-            <div className="w-1/4 hover:w-1/2 border-r border-lectra-border bg-lectra-surface flex flex-col min-w-[350px] transition-all duration-300 ease-in-out">
+            <div className="w-1/4 hover:w-1/2 border-r border-lectra-border bg-lectra-surface flex flex-col min-w-[350px] transition-all duration-600 ease-in-out">
                 {/* Chat Header */}
                 <div className="p-4 border-b border-lectra-border bg-white/80 backdrop-blur-sm sticky top-0 z-10">
                     <div className="flex items-center gap-3">
@@ -168,91 +209,159 @@ export default function CourseDetailPage() {
                 <div className="flex border-b border-lectra-border bg-white sticky top-0 z-10">
                     <button 
                         onClick={() => setActiveTab('materials')}
-                        className={`py-4 text-sm font-bold transition-all border-b-2 cursor-pointer ${activeTab === 'materials' ? 'w-3/4 border-lectra-primary text-lectra-text bg-lectra-surface/50' : 'w-1/4 border-transparent text-lectra-text-secondary hover:text-lectra-text hover:bg-gray-50'}`}
+                        className={`py-4 text-sm font-bold transition-all border-b-2 cursor-pointer transition-all duration-500 ease-in-out ${activeTab === 'materials' ? 'w-3/4 border-lectra-primary text-lectra-text bg-lectra-surface/50' : 'w-1/4 border-transparent text-lectra-text-secondary hover:text-lectra-text hover:bg-gray-50'}`}
                     >
                         Course Materials
                     </button>
                     <button 
                         onClick={() => setActiveTab('upload')}
-                        className={`py-4 text-sm font-bold transition-all border-b-2 cursor-pointer ${activeTab === 'upload' ? 'w-3/4 border-lectra-primary text-lectra-text bg-lectra-surface/50' : 'w-1/4 border-transparent text-lectra-text-secondary hover:text-lectra-text hover:bg-gray-50'}`}
+                        className={`py-4 text-sm font-bold transition-all border-b-2 cursor-pointer transition-all duration-500 ease-in-out ${activeTab === 'upload' ? 'w-3/4 border-lectra-primary text-lectra-text bg-lectra-surface/50' : 'w-1/4 border-transparent text-lectra-text-secondary hover:text-lectra-text hover:bg-gray-50'}`}
                     >
                         Upload & Share
                     </button>
                 </div>
 
+                {/* Filter Tabs */}
+                {activeTab === 'materials' && (
+                    <div className="flex border-b border-lectra-border bg-white overflow-x-auto">
+                        <button 
+                            onClick={() => setMaterialFilter('all')}
+                            className={`px-6 py-2 text-xs font-bold transition-all border-b-2 cursor-pointer whitespace-nowrap ${
+                                materialFilter === 'all' 
+                                    ? 'border-lectra-primary text-lectra-text bg-lectra-surface/50' 
+                                    : 'border-transparent text-lectra-text-secondary hover:text-lectra-text hover:bg-gray-50'
+                            }`}
+                        >
+                            All Materials
+                        </button>
+                        <button 
+                            onClick={() => setMaterialFilter('test')}
+                            className={`px-6 py-2 text-xs font-bold transition-all border-b-2 cursor-pointer whitespace-nowrap ${
+                                materialFilter === 'test' 
+                                    ? 'border-lectra-primary text-lectra-text bg-lectra-surface/50' 
+                                    : 'border-transparent text-lectra-text-secondary hover:text-lectra-text hover:bg-gray-50'
+                            }`}
+                        >
+                            Test
+                        </button>
+                        <button 
+                            onClick={() => setMaterialFilter('assignment')}
+                            className={`px-6 py-2 text-xs font-bold transition-all border-b-2 cursor-pointer whitespace-nowrap ${
+                                materialFilter === 'assignment' 
+                                    ? 'border-lectra-primary text-lectra-text bg-lectra-surface/50' 
+                                    : 'border-transparent text-lectra-text-secondary hover:text-lectra-text hover:bg-gray-50'
+                            }`}
+                        >
+                            Assignment
+                        </button>
+                        <button 
+                            onClick={() => setMaterialFilter('notes')}
+                            className={`px-6 py-2 text-xs font-bold transition-all border-b-2 cursor-pointer whitespace-nowrap ${
+                                materialFilter === 'notes' 
+                                    ? 'border-lectra-primary text-lectra-text bg-lectra-surface/50' 
+                                    : 'border-transparent text-lectra-text-secondary hover:text-lectra-text hover:bg-gray-50'
+                            }`}
+                        >
+                            Notes
+                        </button>
+                        <button 
+                            onClick={() => setMaterialFilter('lecture')}
+                            className={`px-6 py-2 text-xs font-bold transition-all border-b-2 cursor-pointer whitespace-nowrap ${
+                                materialFilter === 'lecture' 
+                                    ? 'border-lectra-primary text-lectra-text bg-lectra-surface/50' 
+                                    : 'border-transparent text-lectra-text-secondary hover:text-lectra-text hover:bg-gray-50'
+                            }`}
+                        >
+                            Lecture
+                        </button>
+                        <button 
+                            onClick={() => setMaterialFilter('other')}
+                            className={`px-6 py-2 text-xs font-bold transition-all border-b-2 cursor-pointer whitespace-nowrap ${
+                                materialFilter === 'other' 
+                                    ? 'border-lectra-primary text-lectra-text bg-lectra-surface/50' 
+                                    : 'border-transparent text-lectra-text-secondary hover:text-lectra-text hover:bg-gray-50'
+                            }`}
+                        >
+                            Other
+                        </button>
+                    </div>
+                )}
+
                 {/* Tab Content Area */}
                 <div className="flex-1 overflow-y-auto p-6 bg-gray-50/30">
                     {activeTab === 'materials' ? (
                         <div className="space-y-6 pb-10">
-                            {/* Section: Quizzes */}
-                            <section>
-                                <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-[10px] font-bold text-lectra-text-secondary uppercase tracking-wider flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                                        Quizzes
-                                    </h3>
-                                    <button className="text-[10px] font-bold text-lectra-primary hover:underline bg-lectra-primary/5 px-2 py-0.5 rounded">View All</button>
-                                </div>
-                                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                                    {quizzes.map((quiz, idx) => (
-                                        <div key={idx} className="bg-white rounded-lg border border-lectra-border p-2.5 hover:border-lectra-primary hover:shadow-sm transition-all cursor-pointer group flex items-center gap-3">
-                                            <div className="w-8 h-8 bg-red-50 rounded-md flex items-center justify-center text-sm group-hover:scale-110 transition-transform flex-shrink-0">
-                                                📝
-                                            </div>
-                                            <div className="min-w-0">
-                                                <h4 className="font-bold text-lectra-text text-xs truncate" title={quiz.title}>{quiz.title}</h4>
-                                                <p className="text-[10px] text-lectra-text-secondary truncate">{quiz.date} • {quiz.score}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </section>
-
-                            {/* Section: Assignments */}
-                            <section>
-                                <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-[10px] font-bold text-lectra-text-secondary uppercase tracking-wider flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                                        Assignments
-                                    </h3>
-                                    <button className="text-[10px] font-bold text-lectra-primary hover:underline bg-lectra-primary/5 px-2 py-0.5 rounded">View All</button>
-                                </div>
-                                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                                    {assignments.map((assign, idx) => (
-                                        <div key={idx} className="bg-white rounded-lg border border-lectra-border p-2.5 hover:border-lectra-primary hover:shadow-sm transition-all cursor-pointer group flex items-center gap-3">
-                                            <div className="w-8 h-8 bg-blue-50 rounded-md flex items-center justify-center text-sm group-hover:scale-110 transition-transform flex-shrink-0">
-                                                💻
-                                            </div>
-                                            <div className="min-w-0">
-                                                <h4 className="font-bold text-lectra-text text-xs truncate" title={assign.title}>{assign.title}</h4>
-                                                <p className="text-[10px] text-lectra-text-secondary truncate">{assign.date} • {assign.status}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </section>
-
-                            {/* Section: Tests */}
-                            <section>
-                                <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-[10px] font-bold text-lectra-text-secondary uppercase tracking-wider flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                                        Tests & Exams
-                                    </h3>
-                                    <button className="text-[10px] font-bold text-lectra-primary hover:underline bg-lectra-primary/5 px-2 py-0.5 rounded">View All</button>
-                                </div>
-                                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                                    <div className="bg-white rounded-lg border border-lectra-border p-2.5 hover:border-lectra-primary hover:shadow-sm transition-all cursor-pointer group flex items-center gap-3">
-                                        <div className="w-8 h-8 bg-purple-50 rounded-md flex items-center justify-center text-sm group-hover:scale-110 transition-transform flex-shrink-0">
-                                            🎓
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h4 className="font-bold text-lectra-text text-xs truncate">Midterm Exam</h4>
-                                            <p className="text-[10px] text-lectra-text-secondary truncate">Oct 25 • 85%</p>
-                                        </div>
+                            {filteredMaterials && filteredMaterials.length > 0 ? (
+                                <section>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className="text-[10px] font-bold text-lectra-text-secondary uppercase tracking-wider">
+                                            {materialFilter === 'all' ? 'All Course Materials' : 
+                                             materialFilter === 'test' ? 'Tests & Exams' :
+                                             materialFilter === 'assignment' ? 'Assignments' :
+                                             materialFilter === 'notes' ? 'Notes & Resources' :
+                                             materialFilter === 'lecture' ? 'Lecture Materials' :
+                                             'Other Materials'}
+                                            <span className="ml-2 text-lectra-error">({filteredMaterials.length})</span>
+                                        </h3>
                                     </div>
+                                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                                        {filteredMaterials.map((item, idx) => {
+                                            return (
+                                                <div 
+                                                    key={idx}
+                                                    onClick={() => setSelectedFile(item)} 
+                                                    className={`bg-white rounded-lg border-3 p-2.5 hover:border-lectra-primary-dark hover:shadow-md transition-all cursor-pointer group`}
+                                                >
+                                                    <div className="w-full h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
+                                                        <Document
+                                                            file={item.file_url}
+                                                            loading={
+                                                                <div className="flex items-center justify-center h-full">
+                                                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-lectra-primary"></div>
+                                                                </div>
+                                                            }
+                                                            error={
+                                                                <div className="flex items-center justify-center h-full text-gray-400">
+                                                                    <span className="text-3xl">📄</span>
+                                                                </div>
+                                                            }
+                                                        >
+                                                            <Page 
+                                                                pageNumber={1} 
+                                                                width={300}
+                                                                renderTextLayer={false}
+                                                                renderAnnotationLayer={false}
+                                                            />
+                                                        </Document>
+                                                    </div>
+
+                                                    {/* Material Info */}
+                                                    <div className="p-2.5 bg-lectra-border">
+                                                        <h4 className="font-bold text-lectra-text text-xs truncate" title={item.file_name}>
+                                                            {item.file_name}
+                                                        </h4>
+                                                        <p className="text-[10px] text-lectra-text-secondary truncate">
+                                                            {item.upload_date}
+                                                        </p>
+                                                        <p className="text-[10px] text-lectra-text-secondary truncate">
+                                                            {item.file_type.charAt(0).toUpperCase() + item.file_type.slice(1)}
+                                                        </p>
+                                                    </div>
+
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-64 text-center">
+                                    <div className="text-4xl mb-4">📭</div>
+                                    <h3 className="text-lg font-bold text-lectra-text mb-2">No materials found</h3>
+                                    <p className="text-sm text-lectra-text-secondary">
+                                        There are no {materialFilter === 'all' ? '' : materialFilter} materials available yet.
+                                    </p>
                                 </div>
-                            </section>
+                            )}
                         </div>
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center p-4">
@@ -269,11 +378,11 @@ export default function CourseDetailPage() {
                                     <div>
                                         <label className="block text-[10px] font-bold text-lectra-text-secondary mb-3 uppercase tracking-wider">What are you uploading?</label>
                                         <div className="grid grid-cols-3 gap-2">
-                                            {['Quiz', 'Test', 'Assignment', 'Notes', 'Lecture', 'Other'].map(type => (
+                                            {['Test', 'Assignment', 'Notes', 'Lecture', 'Other'].map(type => (
                                                 <button 
                                                     key={type}
                                                     onClick={() => setUploadType(type.toLowerCase())}
-                                                    className={`px-2 py-2.5 rounded-lg text-xs font-bold border transition-all ${
+                                                    className={`px-2 py-2.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                                                         uploadType === type.toLowerCase() 
                                                         ? 'bg-lectra-primary text-lectra-text border-lectra-primary shadow-sm ring-2 ring-lectra-primary/20' 
                                                         : 'bg-white border-lectra-border text-lectra-text-secondary hover:border-lectra-primary hover:text-lectra-text'
@@ -300,6 +409,13 @@ export default function CourseDetailPage() {
                     )}
                 </div>
             </div>
+
+            {selectedFile && (
+                <FilePopUp 
+                    file={selectedFile} 
+                    onClose={() => setSelectedFile(null)} 
+                />
+            )}
 
         </div>
         </div>
