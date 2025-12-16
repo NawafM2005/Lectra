@@ -7,5 +7,4 @@ export interface Course {
   course_code: string;
   course_name: string;
   description: string;
-  num_of_files: number;
 }

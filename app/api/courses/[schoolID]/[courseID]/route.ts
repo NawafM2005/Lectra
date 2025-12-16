@@ -45,7 +45,6 @@ export async function GET(
       course_code,
       course_name,
       description,
-      num_of_files,
       school:school_id(id, name, campus)
     `)
     .eq("school_id", school.id)

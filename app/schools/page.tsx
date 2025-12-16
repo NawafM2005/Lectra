@@ -24,11 +24,6 @@ export default function Schools() {
     fetchSchools();
   }, []);
 
-  const topSchools = useMemo(() => {
-    return [...schools]
-      .sort((a, b) => b.num_of_files - a.num_of_files);
-  }, [schools]);
-
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
@@ -58,7 +53,7 @@ export default function Schools() {
         <div className="relative z-10 text-center px-8 max-w-4xl mx-auto">
           
           <div className="inline-block mb-6 px-4 py-1.5 rounded-full bg-white border border-lectra-border shadow-sm">
-            <span className="text-lectra-text-secondary font-semibold text-sm tracking-wide">🎓 JOIN 50+ UNIVERSITIES</span>
+            <span className="text-lectra-text-secondary font-semibold text-sm tracking-wide">🎓 JOIN 15+ UNIVERSITIES</span>
           </div>
 
           <h1 className="text-5xl md:text-7xl font-extrabold mb-8 text-lectra-text tracking-tight">
@@ -120,13 +115,6 @@ export default function Schools() {
             )}
           </div>
 
-          <p className="text-sm text-lectra-text-secondary font-medium">
-            Don&apos;t see your school?{" "}
-            <Link href="/request" className="text-lectra-primary-dark font-bold hover:underline decoration-2 underline-offset-4">
-              Request to add it here
-            </Link>
-          </p>
-
         </div>
       </section>
       
@@ -138,7 +126,7 @@ export default function Schools() {
           </div>
           
           <Container className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {topSchools.map((school) => (
+            {schools.map((school) => (
               <SchoolCard
               key={school.name + "-" + school.campus}
               {...school}

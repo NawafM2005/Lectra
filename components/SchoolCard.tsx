@@ -4,7 +4,7 @@ import { School } from "@/app/types/school"
 import Image from "next/image";
 
 export default function SchoolCard(school: School) {
-    const { name, campus, num_of_files, logo_url } = school;
+    const { name, campus, logo_url } = school;
     const schoolFormatted = name.toLowerCase().replace(/\s/g, '-');
     const campusFormatted = campus ? encodeURIComponent(campus.toLowerCase()) : "";
 
@@ -25,9 +25,6 @@ export default function SchoolCard(school: School) {
                             className="w-auto h-auto max-w-[120px] max-h-[60px] p-1 object-contain"
                         />
                     </div>
-                    <span className="bg-black/60 text-white text-xs font-bold px-3 py-1 rounded-full border border-lectra-border">
-                        {num_of_files} Files
-                    </span>
                 </div>
         
                 <h3 className="text-xl font-bold text-black mb-2">

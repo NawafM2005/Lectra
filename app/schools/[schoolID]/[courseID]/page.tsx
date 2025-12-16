@@ -1,12 +1,13 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Course } from "@/app/types/course"
 import { File } from "@/app/types/file"
 import dynamic from 'next/dynamic';
 import FilePopUp from "@/components/FilePopUp";
+import { Message } from "@/app/types/message"
 
 // Dynamically import react-pdf components with no SSR
 const Document = dynamic(
@@ -41,6 +42,16 @@ export default function CourseDetailPage() {
 
     const [course, setCourse] = useState<Course | null>(null);
     const [files, setFiles] = useState<File[] | null>(null);
+
+    const [isUploading, setIsUploading] = useState(false);
+    const [filesToUpload, setFilesToUpload] = useState<globalThis.File[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [inputMessage, setInputMessage] = useState('');
+    const [isChatLoading, setIsChatLoading] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
         
     const schoolName = schoolID
         ? schoolID.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
@@ -71,7 +82,7 @@ export default function CourseDetailPage() {
         }
 
         fetchCourse();
-    }, []);
+    }, [activeTab]);
 
     useEffect(() => {
         const fetchFiles = async () => {
@@ -100,18 +111,202 @@ export default function CourseDetailPage() {
         fetchFiles();
     }, [activeTab]);
 
+    useEffect(() => {
+        const savedChat = localStorage.getItem(`lectra-chat-${schoolID}-${courseID}`);
+        if (savedChat) {
+            try {
+                setMessages(JSON.parse(savedChat));
+            } catch (e) {
+                console.error("Failed to parse chat history", e);
+            }
+        } else {
+            setMessages([{
+                role: 'ai',
+                content: "Hello! I'm ready to help you with this course. Need help finding a quiz or understanding a topic?",
+                timestamp: Date.now()
+            }]);
+        }
+    }, [schoolID, courseID]);
+
+    useEffect(() => {
+        if (messages.length > 0) {
+            localStorage.setItem(`lectra-chat-${schoolID}-${courseID}`, JSON.stringify(messages));
+        }
+    }, [messages, schoolID, courseID]);
+
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [messages, isChatLoading, isTyping]);
+
      if (!course){
         return null;
     }
+
+    const handleSendMessage = async () => {
+        if (!inputMessage.trim() || isChatLoading) return;
+
+        const userMsg: Message = {
+            role: 'user',
+            content: inputMessage,
+            timestamp: Date.now()
+        };
+
+        setMessages(prev => [...prev, userMsg]);
+        setInputMessage('');
+        setIsChatLoading(true);
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    message: userMsg.content,
+                    courseID,
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed to fetch response');
+
+            const data = await response.json();
+            const fullResponse = data.response || data.message || "Here is what I found.";
+            
+            setIsChatLoading(false);
+            setIsTyping(true);
+
+            setMessages(prev => [...prev, {
+                role: 'ai',
+                content: '',
+                timestamp: Date.now()
+            }]);
+
+            let i = 0;
+            const typingSpeed = 10;
+
+            const intervalId = setInterval(() => {
+                setMessages(prev => {
+                    const newMessages = [...prev];
+                    const lastMsgIndex = newMessages.length - 1;
+                    
+                    if (lastMsgIndex < 0 || newMessages[lastMsgIndex].role !== 'ai') {
+                        clearInterval(intervalId);
+                        setIsTyping(false);
+                        return prev;
+                    }
+
+                    newMessages[lastMsgIndex] = {
+                        ...newMessages[lastMsgIndex],
+                        content: fullResponse.slice(0, i + 1)
+                    };
+
+                    return newMessages;
+                });
+
+                i++;
+                if (i >= fullResponse.length) {
+                    clearInterval(intervalId);
+                    setIsTyping(false);
+                }
+            }, typingSpeed);
+
+        } catch (error) {
+            console.error("Chat error:", error);
+            setMessages(prev => [...prev, {
+                role: 'ai',
+                content: "Sorry, I'm having trouble connecting right now. Please try again later.",
+                timestamp: Date.now()
+            }]);
+        } finally {
+            setIsChatLoading(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            handleSendMessage();
+        }
+    };
+
+    const handleClearChat = () => {
+        localStorage.removeItem(`lectra-chat-${schoolID}-${courseID}`);
+        setMessages([{
+            role: 'ai',
+            content: "Hello! I'm ready to help you with this course. Need help finding a quiz or understanding a topic?",
+            timestamp: Date.now()
+        }]);
+    };
 
     // Filter materials based on selected filter
     const filteredMaterials = materialFilter === 'all' 
         ? files 
         : files?.filter(f => f.file_type === materialFilter);
+    
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            setFilesToUpload(Array.from(e.target.files));
+        }
+    };
+
+    const handleUpload = async () => {
+        if (filesToUpload.length === 0) return;
+
+        setIsUploading(true);
+        try {
+            const uploadPromises = filesToUpload.map(async (file) => {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('courseID', courseID);
+                formData.append('schoolID', schoolID);
+                formData.append('type', uploadType);
+
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown server error' }));
+                    throw new Error(errorData.error || `Upload failed for ${file.name}`);
+                }
+
+                const data = await response.json();
+
+                fetch('/api/process-embedding', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({fileID: data.id})
+                });
+                
+                return data;
+            });
+
+            await Promise.all(uploadPromises);
+
+            setFilesToUpload([]);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            setActiveTab('materials');
+        } catch (error) {
+            console.error("Error uploading files:", error);
+            alert("Failed to upload some files. Please try again.");
+        } finally {
+            setIsUploading(false);
+        }
+    }
 
 
     return (
-        <div className="flex flex-col h-[calc(100vh-80px)] bg-white overflow-hidden">
+        <>
+        <div className="lg:hidden flex flex-col items-center justify-center h-[calc(100vh-80px)] bg-gray-50 p-8 text-center">
+            <div className="text-6xl mb-6">💻</div>
+            <h2 className="text-2xl font-bold text-lectra-text mb-3">Screen too small</h2>
+            <p className="text-lectra-text-secondary max-w-md mx-auto">
+                Please use a laptop or desktop computer to access this course page.
+            </p>
+        </div>
+        <div className="hidden lg:flex flex-col h-[calc(100vh-80px)] bg-white overflow-hidden">
         
         {/* Compact Header */}
         <header className="flex-none h-14 border-b border-lectra-border bg-white px-6 flex items-center justify-between z-10">
@@ -124,12 +319,6 @@ export default function CourseDetailPage() {
                 <h1 className="text-xs font-bold text-lectra-text max-w-[300px]">{course.course_name}</h1>
                 <span className="bg-lectra-primary text-black text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">{course.course_code}</span>
             </div>
-
-            <div className="flex items-center gap-6">
-                <div className="hidden lg:flex items-center gap-4 text-md text-lectra-text-secondary border-r border-lectra-border pr-6">
-                    <span className="flex items-center gap-1"> <b>{course.num_of_files}</b> Files</span>
-                </div>
-            </div>
         </header>
 
         {/* Main Content - Split View */}
@@ -139,53 +328,62 @@ export default function CourseDetailPage() {
             <div className="w-1/4 hover:w-1/2 border-r border-lectra-border bg-lectra-surface flex flex-col min-w-[350px] transition-all duration-600 ease-in-out">
                 {/* Chat Header */}
                 <div className="p-4 border-b border-lectra-border bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-lectra-accent to-lectra-accent-hover rounded-xl flex items-center justify-center text-white text-xl shadow-lg shadow-lectra-accent/20">
-                            🤖
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-lectra-accent to-lectra-accent-hover rounded-xl flex items-center justify-center text-white text-xl shadow-lg shadow-lectra-accent/20">
+                                🤖
+                            </div>
+                            <div>
+                                <h2 className="text-base font-bold text-lectra-text leading-tight">Lectra AI</h2>
+                                <p className="text-[10px] text-lectra-text-secondary font-medium uppercase tracking-wider">Course Assistant</p>
+                            </div>
                         </div>
-                        <div>
-                            <h2 className="text-base font-bold text-lectra-text leading-tight">Lectra AI</h2>
-                            <p className="text-[10px] text-lectra-text-secondary font-medium uppercase tracking-wider">Course Assistant</p>
-                        </div>
+
+                        <button 
+                            onClick={handleClearChat}
+                            className="text-[10px] font-bold text-lectra-text-secondary hover:text-red-500 transition-colors uppercase tracking-wider px-3 py-1.5 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-200 cursor-pointer"
+                        >
+                            Clear
+                        </button>
                     </div>
                 </div>
 
                 {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                    <div className="flex gap-3">
-                    <div className="w-8 h-8 bg-lectra-accent rounded-full flex items-center justify-center text-white text-xs flex-shrink-0 shadow-md">AI</div>
-                    <div className="bg-white border border-lectra-border rounded-2xl rounded-tl-none px-4 py-3 flex-1 shadow-sm max-w-[85%]">
-                        <p className="text-lectra-text text-sm leading-relaxed">
-                        Hello! I&apos;m ready to help you with <strong></strong>. Need help finding a quiz or understanding a topic?
-                        </p>
-                    </div>
-                    </div>
-                    
-                    {/* Example User Message */}
-                    <div className="flex gap-3 justify-end">
-                    <div className="bg-lectra-primary rounded-2xl rounded-tr-none px-4 py-3 max-w-[85%] shadow-md">
-                        <p className="text-lectra-text text-sm font-medium">Show me the latest quizzes.</p>
-                    </div>
-                    <div className="w-8 h-8 bg-lectra-text rounded-full flex items-center justify-center text-white text-xs flex-shrink-0 shadow-md">You</div>
-                    </div>
-
-                    {/* Example AI Response */}
-                    <div className="flex gap-3">
-                    <div className="w-8 h-8 bg-lectra-accent rounded-full flex items-center justify-center text-white text-xs flex-shrink-0 shadow-md">AI</div>
-                    <div className="bg-white border border-lectra-border rounded-2xl rounded-tl-none px-4 py-3 flex-1 shadow-sm max-w-[85%]">
-                        <p className="text-lectra-text text-sm mb-2">Here are the most recent quizzes uploaded for this course:</p>
-                        <div className="grid grid-cols-2 gap-2">
-                            <div className="bg-lectra-surface p-2 rounded border border-lectra-border text-xs">
-                                <span className="font-bold block">Week 1 Quiz</span>
-                                <span className="text-lectra-text-secondary">Nov 10</span>
+                <div className="flex-1 overflow-y-auto p-4 space-y-6" ref={chatContainerRef}>
+                    {messages.map((msg, index) => (
+                        <div key={index} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs flex-shrink-0 shadow-md ${
+                                msg.role === 'ai' ? 'bg-lectra-accent text-white' : 'bg-lectra-primary text-black'
+                            }`}>
+                                {msg.role === 'ai' ? 'AI' : 'You'}
                             </div>
-                            <div className="bg-lectra-surface p-2 rounded border border-lectra-border text-xs">
-                                <span className="font-bold block">HTML Basics</span>
-                                <span className="text-lectra-text-secondary">Nov 12</span>
+                            <div className={`border rounded-2xl px-4 py-3 flex-1 shadow-sm max-w-[85%] ${
+                                msg.role === 'ai' 
+                                ? 'bg-white border-lectra-border rounded-tl-none' 
+                                : 'bg-lectra-surface border-lectra-primary/20 rounded-tr-none'
+                            }`}>
+                                <p className="text-lectra-text text-sm leading-relaxed whitespace-pre-wrap">
+                                    {msg.content}
+                                </p>
+                                <p className="text-[10px] text-lectra-text-secondary mt-1 text-right opacity-70">
+                                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
                             </div>
                         </div>
-                    </div>
-                    </div>
+                    ))}
+
+                    {isChatLoading && (
+                        <div className="flex gap-3">
+                             <div className="w-8 h-8 bg-lectra-accent rounded-full flex items-center justify-center text-white text-xs flex-shrink-0 shadow-md">AI</div>
+                             <div className="bg-white border border-lectra-border rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
+                                <div className="flex gap-1">
+                                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-75"></div>
+                                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></div>
+                                </div>
+                             </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Input Area */}
@@ -194,9 +392,16 @@ export default function CourseDetailPage() {
                         <input
                             type="text"
                             placeholder="Ask about quizzes, assignments, or topics..."
+                            value={inputMessage}
+                            onChange={(e) => setInputMessage(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            disabled={isChatLoading}
                             className="w-full pl-4 pr-12 py-3 border-2 border-lectra-border rounded-xl text-sm text-lectra-text focus:outline-none focus:border-lectra-primary transition-all"
                         />
-                        <button className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-lectra-accent text-white rounded-lg flex items-center justify-center hover:bg-lectra-accent-hover transition-all cursor-pointer">
+                        <button className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-lectra-accent text-white rounded-lg flex items-center justify-center hover:bg-lectra-accent-hover transition-all cursor-pointer"
+                                onClick={handleSendMessage}
+                                disabled={!inputMessage.trim() || isChatLoading}
+                        >
                             ↑
                         </button>
                     </div>
@@ -393,15 +598,49 @@ export default function CourseDetailPage() {
                                             ))}
                                         </div>
                                     </div>
+
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleFileSelect}
+                                        className="hidden"
+                                        accept=".pdf,.png,.jpg,.jpeg"
+                                        multiple                                    
+                                    />
                                     
-                                    <div className="border-2 border-dashed border-lectra-border rounded-xl p-8 text-center hover:border-lectra-primary hover:bg-lectra-primary/5 transition-all cursor-pointer group">
-                                        <span className="text-3xl block mb-3 group-hover:scale-110 transition-transform">📂</span>
-                                        <span className="text-sm font-bold text-lectra-text block">Click to browse files</span>
-                                        <span className="text-xs text-lectra-text-secondary mt-1 block">or drag and drop here</span>
+                                    <div 
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group ${
+                                            filesToUpload.length > 0
+                                            ? 'border-lectra-primary bg-lectra-primary/5' 
+                                            : 'border-lectra-border hover:border-lectra-primary hover:bg-lectra-primary/5'
+                                        }`}
+                                    >
+                                        <span className="text-3xl block mb-3 group-hover:scale-110 transition-transform">
+                                            {filesToUpload.length > 0 ? '📄' : '📂'}
+                                        </span>
+                                        <span className="text-sm font-bold text-lectra-text block">
+                                            {filesToUpload.length > 0 
+                                                ? `${filesToUpload.length} file(s) selected` 
+                                                : 'Click to browse files'}
+                                        </span>
+                                        <span className="text-xs text-lectra-text-secondary mt-1 block">
+                                            {filesToUpload.length > 0
+                                                ? filesToUpload.map(f => f.name).join(', ')
+                                                : 'Supports PDF and Images (Multiple allowed)'}
+                                        </span>
                                     </div>
 
-                                    <button className="w-full bg-lectra-text text-white py-3.5 rounded-xl font-bold hover:bg-black transition-all shadow-lg hover:shadow-xl active:scale-95">
-                                        Upload {uploadType.charAt(0).toUpperCase() + uploadType.slice(1)}
+                                    <button
+                                        onClick={handleUpload} 
+                                        disabled={filesToUpload.length === 0 || isUploading}
+                                        className={`w-full py-3.5 rounded-xl font-bold transition-all shadow-lg cursor-pointer ${
+                                            filesToUpload.length === 0 || isUploading
+                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                            : 'bg-lectra-text text-white hover:bg-black hover:shadow-xl active:scale-95'
+                                        }`}
+                                        >
+                                        {isUploading ? 'Uploading...' : `Upload ${filesToUpload.length > 0 ? `(${filesToUpload.length})` : ''} ${uploadType.charAt(0).toUpperCase() + uploadType.slice(1)}`} 
                                     </button>
                                 </div>
                             </div>
@@ -419,5 +658,6 @@ export default function CourseDetailPage() {
 
         </div>
         </div>
+        </>
     );
 }

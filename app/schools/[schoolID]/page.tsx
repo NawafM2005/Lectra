@@ -31,28 +31,29 @@ export default function SchoolDetailPage() {
   const displayName = campusName ? `${schoolName} - ${campusName}` : schoolName;
 
   const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   
     useEffect(() => {
         const fetchCourses = async() => {
-          const url = campusID 
-            ? `/api/courses/${schoolID}?campus=${campusID}`
-            : `/api/courses/${schoolID}`;
-          const res = await fetch(url);
-          const data = await res.json();
-          setCourses(data);
+          try {
+            const url = campusID 
+              ? `/api/courses/${schoolID}?campus=${campusID}`
+              : `/api/courses/${schoolID}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            setCourses(data);
+          } catch (error) {
+            console.error("Failed to fetch courses", error);
+          } finally {
+            setLoading(false);
+          }
         };
     
         fetchCourses();
       }, [schoolID, campusID]);
-    
-      const topCourses = useMemo(() => {
-        return [...courses]
-          .sort((a, b) => b.num_of_files - a.num_of_files)
-          .slice(0, 6);
-      }, [courses]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
       const query = e.target.value;
@@ -160,11 +161,11 @@ export default function SchoolDetailPage() {
           {/* Stats */}
           <div className="grid grid-cols-2 gap-8 max-w-2xl mx-auto">
             <div className="text-center">
-              <h3 className="text-3xl font-bold text-lectra-text mb-1">500+</h3>
+              <h3 className="text-3xl font-bold text-lectra-text mb-1">{courses.length}+</h3>
               <p className="text-lectra-text-secondary text-sm">Courses</p>
             </div>
             <div className="text-center">
-              <h3 className="text-3xl font-bold text-lectra-text mb-1">12k+</h3>
+              <h3 className="text-3xl font-bold text-lectra-text mb-1">100+</h3>
               <p className="text-lectra-text-secondary text-sm">Files</p>
             </div>
           </div>
@@ -175,7 +176,25 @@ export default function SchoolDetailPage() {
       {/* Popular Courses Section */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-8">
-          <div className="flex items-center justify-between mb-12">
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-lectra-primary"></div>
+            </div>
+          ) : courses.length == 0 ? (
+            <div className="flex items-center justify-between mb-12">
+            <div>
+              <h2 className="text-3xl md:text-4xl font-bold text-lectra-text mb-2">No Courses Yet!</h2>
+              <p className="text-sm text-lectra-text-secondary font-medium">
+                Don&apos;t see your course?{" "}
+                <Link href="/request" className="text-lectra-primary-dark font-bold hover:underline decoration-2 underline-offset-4">
+                  Request to add it here
+                </Link>
+              </p>
+            </div>
+          </div>
+          ) : (
+            <>
+            <div className="flex items-center justify-between mb-12">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold text-lectra-text mb-2">Popular Courses</h2>
               <p className="text-lectra-text-secondary">Most accessed courses at {displayName}</p>
@@ -183,13 +202,15 @@ export default function SchoolDetailPage() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {topCourses.map((course) => (
+            {courses.slice(0,12).map((course) => (
               <CourseCard
                 key={course.course_code}
                 {...course}
               />
             ))}
           </div>
+          </>
+          )}
         </div>
       </section>
 

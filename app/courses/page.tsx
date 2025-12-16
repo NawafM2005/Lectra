@@ -23,20 +23,16 @@ export default function Courses() {
   
       fetchCourses();
     }, []);
-  
-    const topCourses = useMemo(() => {
-      return [...courses]
-        .sort((a, b) => b.num_of_files - a.num_of_files);
-    }, [courses]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
       const query = e.target.value;
       setSearchQuery(query);
   
       if (query.length > 0) {
+        const normalizedQuery = query.toLowerCase().replace(/\s/g, '');
         const filtered = courses.filter((course) => 
-          course.course_name.toLowerCase().includes(query.toLowerCase()) ||
-          course.course_code.toLowerCase().includes(query.toLowerCase())
+          course.course_name.toLowerCase().replace(/\s/g, '').includes(normalizedQuery) ||
+          course.course_code.toLowerCase().replace(/\s/g, '').includes(normalizedQuery)
         );
         setFilteredCourses(filtered);
         setShowDropdown(true);
@@ -143,7 +139,7 @@ export default function Courses() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {topCourses.map((course) => (
+            {courses.slice(0,12).map((course) => (
               <CourseCard
                 key={course.course_code + "-" + course.school.name + "-" + course.school.campus}
                 {...course}
