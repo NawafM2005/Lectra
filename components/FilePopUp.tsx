@@ -18,13 +18,22 @@ export default function FilePopUp({ file, onClose }: FilePopupProps) {
         setNumPages(numPages);
     }
 
-    const handleDownload = () => {
-        const link = document.createElement('a');
-        link.href = file.file_url;
-        link.download = `${file.file_name}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    const handleDownload = async () => {
+        try {
+            const response = await fetch(file.file_url);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = file.file_name;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Download failed:', error);
+            window.open(file.file_url, '_blank');
+        }
     }   
 
     return (
