@@ -17,10 +17,11 @@ export async function POST(req: Request) {
         }
 
         const formattedCourseCode = courseCodeRaw.replace(/-/g, ' '); 
+        console.log(formattedCourseCode);
 
         const { data: courseData, error: courseError } = await supabase
             .from('courses')
-            .select('id, school_id, num_of_files')
+            .select('id, school_id')
             .ilike('course_code', formattedCourseCode)
             .single();
 
@@ -30,7 +31,6 @@ export async function POST(req: Request) {
         }
 
         const courseIdInt = courseData.id;
-        const schoolIdInt = courseData.school_id;
 
         let fileBuffer = await file.arrayBuffer();
         let finalFileName = file.name;
