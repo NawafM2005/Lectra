@@ -8,8 +8,10 @@ import { File } from "@/app/types/file"
 import dynamic from 'next/dynamic';
 import FilePopUp from "@/components/FilePopUp";
 import { Message } from "@/app/types/message"
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import ReactMarkdown from 'react-markdown';
 
-// Dynamically import react-pdf components with no SSR
 const Document = dynamic(
     () => import('react-pdf').then((mod) => mod.Document),
     { ssr: false }
@@ -52,6 +54,10 @@ export default function CourseDetailPage() {
     const [isChatLoading, setIsChatLoading] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const chatContainerRef = useRef<HTMLDivElement>(null);
+
+    const [selectedFilesForDeletion, setSelectedFilesForDeletion] = useState<Set<number>>(new Set());
+    const [isDeletionMode, setIsDeletionMode] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
         
     const schoolName = schoolID
         ? schoolID.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
@@ -78,6 +84,7 @@ export default function CourseDetailPage() {
                 setCourse(data);
             } catch (error) {
                 console.error("Error fetching course:", error);
+                toast.error("Failed to load course information");
             }
         }
 
@@ -105,6 +112,7 @@ export default function CourseDetailPage() {
                 }
             } catch (error) {
                 console.error("Error fetching files:", error);
+                toast.error("Failed to load course materials");
             }
         }
 
@@ -118,6 +126,7 @@ export default function CourseDetailPage() {
                 setMessages(JSON.parse(savedChat));
             } catch (e) {
                 console.error("Failed to parse chat history", e);
+                toast.error("Failed to load chat history");
             }
         } else {
             setMessages([{
@@ -212,6 +221,7 @@ export default function CourseDetailPage() {
 
         } catch (error) {
             console.error("Chat error:", error);
+            toast.error("Failed to get AI response. Please try again.");
             setMessages(prev => [...prev, {
                 role: 'ai',
                 content: "Sorry, I'm having trouble connecting right now. Please try again later.",
@@ -237,14 +247,72 @@ export default function CourseDetailPage() {
         }]);
     };
 
-    // Filter materials based on selected filter
+    const toggleFileSelection = (fileId: number) => {
+        setSelectedFilesForDeletion(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(fileId)) {
+                newSet.delete(fileId);
+            } else {
+                newSet.add(fileId);
+            }
+            return newSet;
+        });
+    };
+
+    const handleDeleteFiles = async () => {
+        if (selectedFilesForDeletion.size === 0) return;
+
+        setIsDeleting(true);
+        try {
+            const deletePromises = Array.from(selectedFilesForDeletion).map(async (fileId) => {
+                const response = await fetch(`/api/delete/${fileId}`, {
+                    method: 'DELETE',
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to delete file ${fileId}`);
+                }
+
+                return fileId;
+            });
+
+            await Promise.all(deletePromises);
+
+            setFiles(prev => prev ? prev.filter(f => !selectedFilesForDeletion.has(f.id)) : null);
+            setSelectedFilesForDeletion(new Set());
+            setIsDeletionMode(false);
+            toast.success("Files deleted successfully!");
+        } catch (error) {
+            console.error("Error deleting files:", error);
+            toast.error("Failed to delete some files!");
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     const filteredMaterials = materialFilter === 'all' 
         ? files 
         : files?.filter(f => f.file_type === materialFilter);
     
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            setFilesToUpload(Array.from(e.target.files));
+            const selectedFiles = Array.from(e.target.files);
+            if (selectedFiles.length > 5) {
+                toast.error("You can only upload up to 5 files at a time!");
+                setFilesToUpload(selectedFiles.slice(0, 5));
+                // Reset the input to allow re-selection
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
+                // Create a new FileList with only 5 files
+                const dt = new DataTransfer();
+                selectedFiles.slice(0, 5).forEach(file => dt.items.add(file));
+                if (fileInputRef.current) {
+                    fileInputRef.current.files = dt.files;
+                }
+            } else {
+                setFilesToUpload(selectedFiles);
+            }
         }
     };
 
@@ -288,9 +356,10 @@ export default function CourseDetailPage() {
             setFilesToUpload([]);
             if (fileInputRef.current) fileInputRef.current.value = '';
             setActiveTab('materials');
+            toast.success("Files uploaded successfully!");
         } catch (error) {
             console.error("Error uploading files:", error);
-            alert("Failed to upload some files. Please try again.");
+            toast.error("Something went wrong 😵ski!");
         } finally {
             setIsUploading(false);
         }
@@ -299,6 +368,7 @@ export default function CourseDetailPage() {
 
     return (
         <>
+        <ToastContainer position="bottom-right" autoClose={3000} />
         <div className="lg:hidden flex flex-col items-center justify-center h-[calc(100vh-80px)] bg-gray-50 p-8 text-center">
             <div className="text-6xl mb-6">💻</div>
             <h2 className="text-2xl font-bold text-lectra-text mb-3">Screen too small</h2>
@@ -325,7 +395,7 @@ export default function CourseDetailPage() {
         <div className="flex-1 flex overflow-hidden">
             
             {/* Left: Chat (Scrollable) */}
-            <div className="w-1/4 hover:w-1/2 border-r border-lectra-border bg-lectra-surface flex flex-col min-w-[350px] transition-all duration-600 ease-in-out">
+            <div className="flex flex-1 border-r border-lectra-border bg-lectra-surface flex flex-col min-w-[350px] transition-all duration-600 ease-in-out">
                 {/* Chat Header */}
                 <div className="p-4 border-b border-lectra-border bg-white/80 backdrop-blur-sm sticky top-0 z-10">
                     <div className="flex items-center justify-between gap-3">
@@ -362,9 +432,16 @@ export default function CourseDetailPage() {
                                 ? 'bg-white border-lectra-border rounded-tl-none' 
                                 : 'bg-lectra-surface border-lectra-primary/20 rounded-tr-none'
                             }`}>
-                                <p className="text-lectra-text text-sm leading-relaxed whitespace-pre-wrap">
-                                    {msg.content}
-                                </p>
+                                <div className="text-lectra-text text-sm leading-relaxed prose prose-sm max-w-none
+                                    prose-p:my-1.5
+                                    prose-ul:my-1.5 prose-ul:pl-4
+                                    prose-ol:my-1.5 prose-ol:pl-4
+                                    prose-li:my-0.5
+                                    prose-strong:font-semibold
+                                    prose-headings:font-bold prose-headings:my-2
+                                    [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                                   <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                </div>
                                 <p className="text-[10px] text-lectra-text-secondary mt-1 text-right opacity-70">
                                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </p>
@@ -384,6 +461,7 @@ export default function CourseDetailPage() {
                              </div>
                         </div>
                     )}
+                    <div ref={(el) => el?.scrollIntoView({ behavior: 'auto' })} />
                 </div>
 
                 {/* Input Area */}
@@ -499,7 +577,7 @@ export default function CourseDetailPage() {
                             {filteredMaterials && filteredMaterials.length > 0 ? (
                                 <section>
                                     <div className="flex items-center justify-between mb-3">
-                                        <h3 className="text-[10px] font-bold text-lectra-text-secondary uppercase tracking-wider">
+                                        <h3 className="text-[11px] font-bold text-lectra-text-secondary uppercase tracking-wider">
                                             {materialFilter === 'all' ? 'All Course Materials' : 
                                              materialFilter === 'test' ? 'Tests & Exams' :
                                              materialFilter === 'assignment' ? 'Assignments' :
@@ -508,15 +586,73 @@ export default function CourseDetailPage() {
                                              'Other Materials'}
                                             <span className="ml-2 text-lectra-error">({filteredMaterials.length})</span>
                                         </h3>
+
+                                        <div className="flex items-center gap-2">
+                                            {isDeletionMode && selectedFilesForDeletion.size > 0 && (
+                                                <button 
+                                                    onClick={handleDeleteFiles}
+                                                    disabled={isDeleting}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all text-[11px] font-bold uppercase tracking-wider cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <span className="group-hover:scale-110 transition-transform">🗑️</span>
+                                                    {isDeleting ? 'Deleting...' : `Delete (${selectedFilesForDeletion.size})`}
+                                                </button>
+                                            )}
+                                            <button 
+                                                onClick={() => {
+                                                    setIsDeletionMode(!isDeletionMode);
+                                                    setSelectedFilesForDeletion(new Set());
+                                                }}
+                                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all text-[11px] font-bold uppercase tracking-wider cursor-pointer group ${
+                                                    isDeletionMode 
+                                                        ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300' 
+                                                        : 'bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border-red-200 hover:border-red-300'
+                                                }`}
+                                            >
+                                                {isDeletionMode ? (
+                                                    <>
+                                                        <span>❌</span>
+                                                        Cancel
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <span className="group-hover:scale-110 transition-transform">🗑️</span>
+                                                        Remove Files
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
                                     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                         {filteredMaterials.map((item, idx) => {
+                                            const isSelected = selectedFilesForDeletion.has(item.id);
                                             return (
                                                 <div 
                                                     key={idx}
-                                                    onClick={() => setSelectedFile(item)} 
-                                                    className={`bg-white rounded-lg border-3 p-2.5 hover:border-lectra-primary-dark hover:shadow-md transition-all cursor-pointer group`}
+                                                    onClick={() => {
+                                                        if (isDeletionMode) {
+                                                            toggleFileSelection(item.id);
+                                                        } else {
+                                                            setSelectedFile(item);
+                                                        }
+                                                    }}
+                                                    className={`bg-white rounded-lg border-3 p-2.5 hover:shadow-md transition-all cursor-pointer group relative ${
+                                                        isDeletionMode 
+                                                            ? isSelected 
+                                                                ? 'border-red-500 ring-2 ring-red-200' 
+                                                                : 'border-gray-300 hover:border-red-300'
+                                                            : 'hover:border-lectra-primary-dark'
+                                                    }`}
                                                 >
+                                                    {isDeletionMode && (
+                                                        <div className={`absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all z-10 ${
+                                                            isSelected 
+                                                                ? 'bg-red-500 border-red-500' 
+                                                                : 'bg-white border-gray-300'
+                                                        }`}>
+                                                            {isSelected && <span className="text-white text-xs">✓</span>}
+                                                        </div>
+                                                    )}
                                                     <div className="w-full h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
                                                         <Document
                                                             file={item.file_url}
@@ -627,7 +763,7 @@ export default function CourseDetailPage() {
                                         <span className="text-xs text-lectra-text-secondary mt-1 block">
                                             {filesToUpload.length > 0
                                                 ? filesToUpload.map(f => f.name).join(', ')
-                                                : 'Supports PDF and Images (Multiple allowed)'}
+                                                : 'Supports PDF and Images (Max 5 files)'}
                                         </span>
                                     </div>
 
