@@ -16,8 +16,45 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lectra",
-  description: "A modern, fast, intelligent course content platform powered by RAG & PostgreSQL",
+  title: "Lectra | AI-Powered Study Companion",
+  description:
+    "Transform your study experience with Lectra. Upload and chat with course materials, access shared notes and past exams, and get instant AI-powered explanations. The smartest way to master your university courses.",
+  keywords: [
+    "Lectra",
+    "AI study tool",
+    "course notes",
+    "exam preparation",
+    "university study guide",
+    "student resources",
+    "AI tutor",
+    "document chat",
+    "study materials sharing",
+    "RAG study platform"
+  ],
+  openGraph: {
+    title: "Lectra - Your Intelligent Study Companion",
+    description:
+      "Upload course materials, chat with AI about your notes, and access a shared library of past exams and summaries. Master your courses with Lectra.",
+    url: "https://lectraai.ca",
+    siteName: "Lectra",
+    images: [
+      {
+        url: "https://lectraai.ca/preview.png",
+        width: 1200,
+        height: 630,
+        alt: "Lectra Platform Preview",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Lectra - Master Your Courses with AI",
+    description:
+      "Chat with your course materials, find shared notes, and ace your exams with Lectra's AI-powered study platform.",
+    images: ["https://lectraai.ca/preview.png"],
+  },
 };
 
 export default function RootLayout({
@@ -36,6 +73,7 @@ export default function RootLayout({
         </main>
         <Footer />
       </body>
+      <Analytics />
     </html>
   );
 }
